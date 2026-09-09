@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const emptyState = document.querySelector('#emptyState');
   const tabs = document.querySelectorAll('.tab-button');
 
-  const savedTickets = JSON.parse(localStorage.getItem('ecessTickets') || '[]');
 
   function renderTicket(ticket) {
     const row = document.createElement('article');
@@ -18,24 +17,59 @@ document.addEventListener('DOMContentLoaded', () => {
     ticketList.prepend(row);
   }
 
-  savedTickets.forEach(renderTicket);
   lucide.createIcons();
 
-  ticketForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(ticketForm);
-    const reference = `ECE-${1060 + savedTickets.length}`;
-    const ticket = { reference, topic: data.get('topic'), message: data.get('message') };
-    savedTickets.push(ticket);
-    localStorage.setItem('ecessTickets', JSON.stringify(savedTickets));
-    renderTicket(ticket);
-    lucide.createIcons();
-    ticketReference.textContent = reference;
+ ticketForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const data = new FormData(ticketForm);
+
+  const ticketData = {
+    name: data.get('name'),
+    email: data.get('email'),
+    topic: data.get('topic'),
+    message: data.get('message')
+  };
+
+  try {
+    const response = await fetch('/.netlify/functions/create-ticket', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(ticketData)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Ticket could not be submitted');
+    }
+
+    ticketReference.textContent = result.id;
     formSuccess.classList.add('visible');
     ticketForm.reset();
+
+    const ticket = {
+      reference: result.id,
+      topic: result.topic,
+      message: result.message
+    };
+
+    renderTicket(ticket);
     updateCounts();
-    setTimeout(() => document.querySelector('#responses').scrollIntoView({ behavior: 'smooth' }), 450);
-  });
+    lucide.createIcons();
+
+    setTimeout(() => {
+      document.querySelector('#responses').scrollIntoView({
+        behavior: 'smooth'
+      });
+    }, 450);
+  } catch (error) {
+    console.error(error);
+    alert('Your ticket could not be submitted. Please try again.');
+  }
+});
 
   function updateCounts() {
     const rows = [...document.querySelectorAll('.ticket-row')];
